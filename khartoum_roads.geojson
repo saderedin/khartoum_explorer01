@@ -1,0 +1,122 @@
+{
+    "type": "FeatureCollection",
+    "features": [{
+            "type": "Feature",
+            "properties": {
+                "name": "Airport Road",
+                "type": "primary",
+                "color": "#fef3c7"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [160, 120],
+                    [220, 150],
+                    [310, 180],
+                    [420, 210],
+                    [560, 260],
+                    [670, 320],
+                    [810, 360],
+                    [900, 410]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Nile Street",
+                "type": "primary",
+                "color": "#fbbf24"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [120, 220],
+                    [180, 270],
+                    [260, 330],
+                    [350, 400],
+                    [470, 500],
+                    [620, 560],
+                    [760, 620]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Al Manshia Street",
+                "type": "secondary",
+                "color": "#6ee7b7"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [670, 120],
+                    [580, 180],
+                    [500, 260],
+                    [440, 360],
+                    [390, 470],
+                    [350, 600]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Al Mogran Avenue",
+                "type": "secondary",
+                "color": "#7dd3fc"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [220, 520],
+                    [330, 500],
+                    [420, 490],
+                    [560, 480],
+                    [680, 470],
+                    [820, 445]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Africa Road",
+                "type": "tertiary",
+                "color": "#a5f3fc"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [270, 640],
+                    [350, 590],
+                    [430, 540],
+                    [510, 520],
+                    [600, 500],
+                    [700, 510],
+                    [840, 525]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Burri Lane",
+                "type": "tertiary",
+                "color": "#c4b5fd"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [210, 320],
+                    [310, 300],
+                    [420, 310],
+                    [530, 340],
+                    [660, 370],
+                    [780, 390]
+                ]
+            }
+        }
+    ]
+}

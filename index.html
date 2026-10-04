@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Khartoum Roads Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.3.0/dist/maplibre-gl.css" />
+    <style>
+        :root {
+            --bg1: #06161f;
+            --bg2: #123a4b;
+            --bg3: #1d4e89;
+            --card: rgba(9, 18, 28, 0.6);
+            --glass: rgba(255, 255, 255, 0.1);
+            --text: #eef2ff;
+            --accent: #67e8f9;
+            --accent2: #c084fc;
+            --success: #34d399;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            height: 100%;
+            font-family: Tahoma, Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3));
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        body {
+            position: relative;
+            display: grid;
+            place-items: center;
+        }
+
+        .map-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #dce8e5;
+        }
+
+        .map-overlay {
+            display: none;
+        }
+
+        .road {
+            fill: none;
+            stroke-width: 3.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.4));
+        }
+
+        .road.primary {
+            stroke: rgba(255, 225, 120, 0.96);
+        }
+
+        .road.secondary {
+            stroke: rgba(110, 231, 183, 0.82);
+            stroke-width: 2.5;
+        }
+
+        .road.tertiary {
+            stroke: rgba(125, 211, 252, 0.82);
+            stroke-width: 2.1;
+        }
+
+        .district-ring {
+            position: fixed;
+            left: 50%;
+            top: 52%;
+            width: min(50vw, 540px);
+            height: min(38vw, 420px);
+            transform: translate(-50%, -50%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 26px;
+            background: rgba(1, 20, 30, 0.12);
+            box-shadow: inset 0 0 30px rgba(103, 232, 249, 0.12);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .district-label {
+            position: fixed;
+            left: 50%;
+            bottom: 90px;
+            transform: translateX(-50%);
+            z-index: 3;
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: rgba(17, 24, 39, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e0f2fe;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .services-panel {
+            position: fixed;
+            top: 94px;
+            right: 24px;
+            width: min(360px, calc(100vw - 32px));
+            max-height: calc(100vh - 120px);
+            overflow: auto;
+            z-index: 1000;
+            background: linear-gradient(135deg, rgba(7, 91, 103, 0.97) 0%, rgba(28, 74, 116, 0.97) 52%, rgba(102, 53, 91, 0.97) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 8px;
+            padding: 18px 16px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+        }
+
+        .page-header {
+            position: fixed;
+            inset: 0 0 auto;
+            z-index: 1100;
+            min-height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 76px 10px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+            background: linear-gradient(105deg, rgba(12, 58, 125, 0.98), rgba(22, 105, 184, 0.97) 52%, rgba(45, 145, 212, 0.96));
+            box-shadow: 0 8px 24px rgba(4, 18, 28, 0.24);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .page-header h1 {
+            margin: 0;
+            color: #f4fbff;
+            font-size: 1.35rem;
+            font-weight: 700;
+            line-height: 1.35;
+            text-align: center;
+        }
+
+        .header-mark {
+            position: absolute;
+            top: 5px;
+            right: 18px;
+            display: flex;
+            width: 48px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            color: #ffe49a;
+        }
+
+        .header-mark svg {
+            display: block;
+            width: 34px;
+            height: 42px;
+            overflow: visible;
+        }
+
+        .header-mark span {
+            font-size: 0.62rem;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .services-panel > h3 {
+            margin: 0 0 14px;
+            font-size: 0.8rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #c7f9ff;
+        }
+
+        .service-tabs {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 4px;
+            margin-bottom: 14px;
+            padding: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 6px;
+            background: rgba(3, 20, 33, 0.3);
+        }
+
+        .service-tab {
+            min-height: 38px;
+            padding: 7px 10px;
+            border: 0;
+            border-radius: 4px;
+            background: transparent;
+            color: rgba(239, 250, 255, 0.78);
+            font: inherit;
+            font-size: 0.82rem;
+            cursor: pointer;
+        }
+
+        .service-tab[aria-selected="true"] {
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+        }
+
+        .service-view[hidden] { display: none; }
+
+        .service-view > h4 {
+            margin: 0 0 12px;
+            color: #d5fbff;
+            font-size: 0.78rem;
+        }
+
+        .neighborhood-tools {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .neighborhood-tools input[type="text"],
+        .neighborhood-tools input[type="file"] {
+            width: 100%;
+            min-width: 0;
+            padding: 9px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            border-radius: 5px;
+            background: rgba(4, 24, 39, 0.45);
+            color: #fff;
+            font: inherit;
+            font-size: 0.78rem;
+        }
+
+        .neighborhood-tools input[type="file"]::file-selector-button {
+            margin-inline-end: 8px;
+            padding: 5px 8px;
+            border: 0;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .neighborhood-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 7px;
+        }
+
+        .neighborhood-action {
+            min-height: 36px;
+            padding: 7px 9px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font: inherit;
+            font-size: 0.74rem;
+            cursor: pointer;
+        }
+
+        .neighborhood-action:disabled { cursor: not-allowed; opacity: 0.48; }
+        .neighborhood-cancel { grid-column: 1 / -1; }
+
+        #neighborhood-status {
+            margin: 0;
+            color: rgba(239, 250, 255, 0.82);
+            font-size: 0.72rem;
+            line-height: 1.5;
+        }
+
+        #neighborhood-list {
+            width: 100%;
+            margin: 2px 0 8px;
+            padding: 9px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            border-radius: 5px;
+            background: rgba(4, 24, 39, 0.45);
+            color: #fff;
+            font: inherit;
+            font-size: 0.78rem;
+        }
+
+        #neighborhood-list option { color: #17252b; }
+
+        .neighborhood-polygon {
+            color: #ffd166;
+            fill: #f4b942;
+            fill-opacity: 0.25;
+            weight: 2;
+        }
+
+        .neighborhood-polygon.neighborhood-active {
+            color: #fff5bf;
+            fill: #ffc83d;
+            fill-opacity: 0.52;
+            weight: 4;
+        }
+
+        #road-select,
+        #hospital-select {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 10px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        #road-select option,
+        #hospital-select option { color: #17252b; }
+
+        #road-status {
+            margin: 0 0 10px;
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.78rem;
+            line-height: 1.6;
+        }
+
+        #hospital-status {
+            margin: 0 0 10px;
+            color: rgba(239, 255, 250, 0.84);
+            font-size: 0.78rem;
+            line-height: 1.5;
+        }
+
+        .road-table {
+            width: 100%;
+            margin-top: 12px;
+            border-collapse: collapse;
+            color: #edf6ff;
+            font-size: 0.82rem;
+        }
+
+        .road-table caption {
+            padding: 8px 0;
+            color: #c7f9ff;
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .road-table th,
+        .road-table td {
+            padding: 8px 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .road-table th {
+            color: rgba(224, 242, 254, 0.72);
+            font-weight: 500;
+            text-align: right;
+        }
+
+        .road-table td { text-align: left; }
+
+        .hospital-table caption { color: #b8ffe8; }
+        .hospital-table td { overflow-wrap: anywhere; }
+
+        .hospital-footnote {
+            margin: 10px 0 0;
+            color: rgba(239, 255, 250, 0.76);
+            font-size: 0.68rem;
+            line-height: 1.6;
+        }
+
+        .hospital-polygon {
+            fill: #20b99a;
+            fill-opacity: 0.34;
+            stroke: #087f70;
+            stroke-width: 3;
+            vector-effect: non-scaling-stroke;
+            cursor: pointer;
+        }
+
+        .hospital-polygon:hover,
+        .hospital-polygon.hospital-selected {
+            fill: #25e0b5;
+            fill-opacity: 0.68;
+            stroke: #f3fff9;
+            stroke-width: 4;
+            filter: drop-shadow(0 0 7px rgba(13, 255, 193, 0.9));
+        }
+
+        .road-popup {
+            min-width: 220px;
+            direction: rtl;
+            color: #20313a;
+            font-family: Tahoma, Arial, sans-serif;
+        }
+
+        .road-popup-title {
+            margin: 0 0 8px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #ff2438;
+            font-size: 0.95rem;
+        }
+
+        .road-popup table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        .road-popup th, .road-popup td { padding: 6px 2px; border-bottom: 1px solid #e4e8eb; }
+        .road-popup th { color: #596a73; font-weight: 500; text-align: right; }
+        .road-popup td { color: #17252b; text-align: left; }
+
+        .map-road-popup {
+            position: fixed;
+            z-index: 1200;
+            width: min(290px, calc(100vw - 24px));
+            max-height: min(60vh, 320px);
+            overflow: auto;
+            padding: 12px 14px;
+            border: 1px solid #d7dee2;
+            border-radius: 6px;
+            background: #fff;
+            box-shadow: 0 12px 32px rgba(12, 25, 31, 0.3);
+        }
+
+        .map-road-popup[hidden] { display: none; }
+
+        .map-road-popup header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #ff2438;
+        }
+
+        .map-road-popup h4 { margin: 0; color: #20313a; font-size: 0.95rem; }
+
+        .map-road-popup button {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: 0;
+            border-radius: 4px;
+            background: #edf1f3;
+            color: #20313a;
+            font-size: 1.25rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .map-road-popup table { width: 100%; border-collapse: collapse; direction: rtl; font-size: 0.82rem; }
+        .map-road-popup th, .map-road-popup td { padding: 7px 2px; border-bottom: 1px solid #e4e8eb; }
+        .map-road-popup th { color: #596a73; font-weight: 500; text-align: right; }
+        .map-road-popup td { color: #17252b; text-align: left; }
+
+        #road-list { max-height: 55vh; overflow-y: auto; }
+
+        .leaflet-container { font: inherit; }
+        .leaflet-control-attribution { direction: ltr; }
+        .leaflet-overlay-pane .road-red-glow {
+            filter: drop-shadow(0 0 4px rgba(255, 20, 45, 0.95)) drop-shadow(0 0 11px rgba(255, 20, 45, 0.85));
+        }
+
+        .road-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid transparent;
+            color: #edf6ff;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: 0.2s ease;
+            text-align: left;
+        }
+
+        .road-item:hover,
+        .road-item.active {
+            border-color: rgba(103, 232, 249, 0.42);
+            background: rgba(103, 232, 249, 0.08);
+            transform: translateX(-2px);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .road-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .road-name {
+            font-size: 0.87rem;
+            font-weight: 700;
+        }
+
+        .road-type {
+            font-size: 0.68rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(224, 242, 254, 0.72);
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(12px);
+            opacity: 0.7;
+            animation: float 12s ease-in-out infinite alternate;
+            z-index: 1;
+        }
+
+        .orb.one {
+            width: 220px;
+            height: 220px;
+            background: rgba(103, 232, 249, 0.35);
+            top: 12%;
+            left: 8%;
+        }
+
+        .orb.two {
+            width: 300px;
+            height: 300px;
+            background: rgba(192, 132, 252, 0.28);
+            bottom: 8%;
+            right: 10%;
+            animation-delay: 2s;
+        }
+
+        .orb.three {
+            width: 180px;
+            height: 180px;
+            background: rgba(52, 211, 153, 0.22);
+            top: 45%;
+            right: 22%;
+            animation-delay: 5s;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            width: min(92vw, 900px);
+            padding: 32px 24px;
+        }
+
+        .hud {
+            position: fixed;
+            top: 28px;
+            left: 28px;
+            z-index: 3;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: rgba(10, 20, 28, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #dff9ff;
+            font-size: 0.72rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .hud::before {
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+            box-shadow: 0 0 16px rgba(74, 222, 128, 0.8);
+        }
+
+        .pin-wrap {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            animation: pulse 2.5s ease-in-out infinite;
+        }
+
+        .pin {
+            position: relative;
+            width: 28px;
+            height: 28px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            background: linear-gradient(135deg, #67e8f9, #c084fc);
+            box-shadow: 0 0 30px rgba(103, 232, 249, 0.8);
+        }
+
+        .pin::before {
+            content: "";
+            position: absolute;
+            inset: 7px;
+            border-radius: 50%;
+            background: rgba(7, 16, 22, 0.8);
+        }
+
+        .pin-label {
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(11, 24, 31, 0.52);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #ecfeff;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        h1 {
+            margin: 22px 0 14px;
+            font-size: clamp(2.3rem, 6vw, 5rem);
+            line-height: 1.05;
+            letter-spacing: -0.06em;
+            animation: slideUp 1s ease both;
+        }
+
+        .gradient-text {
+            background: linear-gradient(90deg, var(--accent), #ffffff, var(--accent2));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        p {
+            margin: 0;
+            font-size: 1.02rem;
+            line-height: 1.9;
+            color: rgba(238, 242, 255, 0.82);
+            max-width: 620px;
+            animation: fadeIn 1.4s ease both;
+            animation-delay: 0.25s;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 32px;
+            animation: fadeIn 1.4s ease both;
+            animation-delay: 0.45s;
+        }
+
+        button {
+            border: none;
+            border-radius: 999px;
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #0b1220;
+            box-shadow: 0 18px 35px rgba(103, 232, 249, 0.35);
+        }
+
+        .secondary {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        button:hover {
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        .dots {
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px);
+            background-size: 24px 24px;
+            mask-image: radial-gradient(circle at center, black 30%, transparent 100%);
+            opacity: 0.5;
+            z-index: 1;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+            100% {
+                transform: translate3d(30px, -30px, 0) scale(1.15);
+            }
+        }
+
+        @keyframes mapFloat {
+            0% { transform: scale(1.18) translateY(0px); }
+            50% { transform: scale(1.35) translateY(-8px); }
+            100% { transform: scale(1.18) translateY(0px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .services-panel {
+                top: 74px;
+                right: 12px;
+                max-height: 78vh;
+                padding: 10px 12px;
+            }
+
+            .page-header {
+                min-height: 66px;
+                padding: 8px 60px 8px 8px;
+            }
+
+            .page-header h1 {
+                font-size: 0.92rem;
+                line-height: 1.35;
+            }
+
+            .header-mark {
+                top: 4px;
+                right: 8px;
+                width: 43px;
+            }
+
+            .header-mark svg {
+                width: 29px;
+                height: 38px;
+            }
+
+            .header-mark span { font-size: 0.58rem; }
+
+            .services-panel > h3 {
+                margin-bottom: 7px;
+                font-size: 0.72rem;
+            }
+
+            .service-tabs { margin-bottom: 9px; }
+
+            #road-select,
+            #hospital-select {
+                margin-bottom: 5px;
+                padding: 7px 9px;
+                font-size: 0.78rem;
+            }
+
+            #road-status,
+            #hospital-status {
+                margin-bottom: 5px;
+                font-size: 0.68rem;
+                line-height: 1.35;
+            }
+
+            .hospital-table {
+                margin-top: 4px;
+                font-size: 0.72rem;
+            }
+
+            .hospital-table th,
+            .hospital-table td {
+                padding: 4px 3px;
+            }
+
+            .hospital-footnote { display: none; }
+
+            .card {
+                padding: 32px 20px;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="page-header">
+        <h1>ولاية الخرطوم المستكشف العام</h1>
+        <div class="header-mark" role="img" aria-label="شعار صقر الجديان، السودان">
+            <svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="32" cy="34" r="29" fill="rgba(255,255,255,0.08)" stroke="#ffe49a" stroke-width="1.5" />
+                <path d="M17 41c4-8 10-13 19-14l7-8 2 8 8 3-8 3c-1 5-5 8-11 9l-2 17h-3l-1-16-3 16h-3l1-18c-3 1-5 2-8 4l-2-4 7-6z" fill="#ffe49a" />
+                <path d="M38 20l2-8 2 7 4-6-1 8M47 29l9-2-7 5" fill="none" stroke="#ffe49a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M19 40c8 1 14 0 20-4M29 47l-5 5m10-5 5 5" fill="none" stroke="#17343b" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            <span>السودان</span>
+        </div>
+    </header>
+    <div class="map-bg" aria-label="Interactive map of Khartoum">
+        <div id="map"></div>
+    </div>
+
+    <aside id="services-panel" class="services-panel" aria-label="الخدمات الأساسية">
+        <h3>الخدمات الأساسية</h3>
+        <div class="service-tabs" role="tablist" aria-label="خدمات الخريطة">
+            <button id="roads-tab" class="service-tab" type="button" role="tab" aria-controls="roads-service" aria-selected="true">الطرق الرئيسية</button>
+            <button id="hospitals-tab" class="service-tab" type="button" role="tab" aria-controls="hospitals-service" aria-selected="false">المستشفيات الحكومية</button>
+            <button id="neighborhoods-tab" class="service-tab" type="button" role="tab" aria-controls="neighborhoods-service" aria-selected="false">الأحياء</button>
+        </div>
+        <section id="roads-service" class="service-view" role="tabpanel" aria-labelledby="roads-tab">
+            <h4>الطرق الرئيسية في الخرطوم</h4>
+            <select id="road-select" aria-label="اختر طريقًا رئيسيًا من شوارع الخرطوم">
+                <option value="">اختر طريقًا رئيسيًا</option>
+                <option value="Nile Street" data-label="شارع النيل" data-color="#e59b32">شارع النيل</option>
+                <option value="Africa Road" data-label="طريق أفريقيا" data-color="#278a83">طريق أفريقيا</option>
+                <option value="Obeid Khatim Street" data-label="شارع عبيد خاتم" data-color="#cf5a50">شارع عبيد خاتم</option>
+                <option value="Al Qasr Street" data-label="شارع القصر" data-color="#497ca8" data-destination-lat="15.6089747" data-destination-lon="32.5288908" data-destination-label="القصر الجمهوري">شارع القصر</option>
+            </select>
+            <p id="road-status" role="status">اختر طريقًا رئيسيًا لإبرازه على الخريطة.</p>
+            <table id="road-properties" class="road-table" hidden>
+                <caption>خصائص الشارع</caption>
+                <tbody>
+                    <tr><th scope="row">الطول</th><td id="road-length"></td></tr>
+                    <tr><th scope="row">العرض</th><td id="road-width"></td></tr>
+                    <tr><th scope="row">التصنيف</th><td id="road-classification"></td></tr>
+                </tbody>
+            </table>
+        </section>
+        <section id="hospitals-service" class="service-view" role="tabpanel" aria-labelledby="hospitals-tab" hidden>
+            <h4>مستشفيات الخرطوم الحكومية</h4>
+            <select id="hospital-select" aria-label="اختر مستشفى حكوميًا من الخرطوم" disabled>
+                <option value="">جارٍ تحميل المستشفيات...</option>
+            </select>
+            <p id="hospital-status" role="status">جارٍ تحميل مضلعات المستشفيات...</p>
+            <table id="hospital-properties" class="road-table hospital-table" hidden>
+                <caption>البيانات الوصفية</caption>
+                <tbody>
+                    <tr><th scope="row">الجهة المشغلة</th><td id="hospital-operator"></td></tr>
+                    <tr><th scope="row">الموقع</th><td id="hospital-location"></td></tr>
+                    <tr><th scope="row">نوع المعلم</th><td id="hospital-type"></td></tr>
+                    <tr><th scope="row">معرّف OSM</th><td id="hospital-osm-id"></td></tr>
+                </tbody>
+            </table>
+            <p class="hospital-footnote">حدود المنشآت ومعلوماتها من OpenStreetMap.</p>
+        </section>
+        <section id="neighborhoods-service" class="service-view" role="tabpanel" aria-labelledby="neighborhoods-tab" hidden>
+            <h4>طبقة أحياء الخرطوم</h4>
+            <div class="neighborhood-tools">
+                <input id="neighborhood-name" type="text" maxlength="100" placeholder="اكتب اسم الحي" aria-label="اسم الحي" />
+                <div class="neighborhood-actions">
+                    <button id="draw-neighborhood" class="neighborhood-action" type="button">ارسم مضلع حي</button>
+                    <button id="update-neighborhood-name" class="neighborhood-action" type="button" disabled>تحديث الاسم</button>
+                    <button id="delete-selected-neighborhood" class="neighborhood-action" type="button" disabled>حذف الحي المختار</button>
+                    <button id="cancel-neighborhood-drawing" class="neighborhood-action neighborhood-cancel" type="button" disabled>إلغاء الرسم</button>
+                </div>
+                <label for="neighborhood-file" class="hospital-footnote">استيراد ملف Shapefile مضغوط ZIP</label>
+                <input id="neighborhood-file" type="file" accept=".zip,application/zip,application/x-zip-compressed" aria-label="استيراد ملف Shapefile بصيغة ZIP" />
+                <p id="neighborhood-status" role="status">يمكنك استيراد ملف ZIP أو كتابة اسم حي ثم رسم حدوده على الخريطة.</p>
+            </div>
+            <select id="neighborhood-list" aria-label="اختر حيًا مضافًا">
+                <option value="">لا توجد أحياء مضافة</option>
+            </select>
+        </section>
+    </aside>
+    <section id="map-road-popup" class="map-road-popup" role="dialog" aria-label="بيانات الشارع" hidden>
+        <header>
+            <h4 id="map-popup-title"></h4>
+            <button id="map-popup-close" type="button" aria-label="إغلاق نافذة بيانات الشارع">×</button>
+        </header>
+        <table><tbody id="map-popup-rows"></tbody></table>
+    </section>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "leaflet": "https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.esm.js",
+                "maplibre-gl": "https://unpkg.com/maplibre-gl@6.3.0/dist/maplibre-gl.mjs"
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+    <script type="module">
+        import * as Leaflet from 'leaflet';
+        import * as maplibregl from 'maplibre-gl';
+        import { maplibreGL } from 'https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/dist/leaflet-maplibre-gl.mjs';
+
+        const L = { ...Leaflet, Event: Leaflet.Event || {} };
+        globalThis.L = L;
+        await maplibregl.setRTLTextPlugin(
+            'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.3.0/dist/mapbox-gl-rtl-text.js',
+            true
+        );
+        await new Promise((resolve, reject) => {
+            const drawScript = document.createElement('script');
+            drawScript.src = 'https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js';
+            drawScript.onload = resolve;
+            drawScript.onerror = reject;
+            document.head.append(drawScript);
+        });
+
+        const mapViewStorageKey = 'khartoum-map-view-v1';
+        function getSavedMapView() {
+            try {
+                const savedView = JSON.parse(localStorage.getItem(mapViewStorageKey));
+                if (!Number.isFinite(savedView?.lat) || !Number.isFinite(savedView?.lng) || !Number.isFinite(savedView?.zoom)) return null;
+                if (savedView.lat < -90 || savedView.lat > 90 || savedView.lng < -180 || savedView.lng > 180) return null;
+                return savedView;
+            } catch {
+                return null;
+            }
+        }
+
+        const savedMapView = getSavedMapView();
+        const map = L.map('map', { zoomControl: true }).setView(
+            savedMapView ? [savedMapView.lat, savedMapView.lng] : [15.5007, 32.5599],
+            savedMapView?.zoom ?? 13
+        );
+        function saveMapView() {
+            const center = map.getCenter();
+            try {
+                localStorage.setItem(mapViewStorageKey, JSON.stringify({ lat: center.lat, lng: center.lng, zoom: map.getZoom() }));
+            } catch (error) {
+                console.error('Could not save map view:', error);
+            }
+        }
+
+        map.on('moveend', saveMapView);
+        const roadStatus = document.getElementById('road-status');
+        const roadSelect = document.getElementById('road-select');
+        const roadProperties = document.getElementById('road-properties');
+        const mapRoadPopup = document.getElementById('map-road-popup');
+        const mapPopupRows = document.getElementById('map-popup-rows');
+        const roadsTab = document.getElementById('roads-tab');
+        const hospitalsTab = document.getElementById('hospitals-tab');
+        const neighborhoodsTab = document.getElementById('neighborhoods-tab');
+        const roadsService = document.getElementById('roads-service');
+        const hospitalsService = document.getElementById('hospitals-service');
+        const neighborhoodsService = document.getElementById('neighborhoods-service');
+        const hospitalSelect = document.getElementById('hospital-select');
+        const hospitalStatus = document.getElementById('hospital-status');
+        const hospitalProperties = document.getElementById('hospital-properties');
+        const hospitalFeatures = new Map();
+        const selectedHospitalLayer = L.geoJSON(null, {
+            style: { color: '#ffcf56', weight: 5, opacity: 1, fillColor: '#ffd45f', fillOpacity: 0.56, className: 'hospital-polygon hospital-selected' }
+        });
+        const hospitalLayer = L.geoJSON(null, {
+            style: { color: '#087f70', weight: 3, opacity: 0.95, fillColor: '#20b99a', fillOpacity: 0.34, className: 'hospital-polygon' },
+            onEachFeature: (feature, layer) => {
+                layer.bindTooltip(feature.properties.label, { sticky: true });
+                layer.on('click', () => {
+                    hospitalSelect.value = feature.properties.id;
+                    selectHospital(feature.properties.id);
+                });
+            }
+        });
+        const roadDestination = L.layerGroup();
+        const neighborhoodsLayer = L.featureGroup();
+        const neighborhoodNameInput = document.getElementById('neighborhood-name');
+        const neighborhoodStatus = document.getElementById('neighborhood-status');
+        const neighborhoodList = document.getElementById('neighborhood-list');
+        const updateNeighborhoodNameButton = document.getElementById('update-neighborhood-name');
+        const deleteSelectedNeighborhoodButton = document.getElementById('delete-selected-neighborhood');
+        const cancelNeighborhoodDrawingButton = document.getElementById('cancel-neighborhood-drawing');
+        const neighborhoodStorageKey = 'khartoum-neighborhoods-v1';
+        let selectedNeighborhoodId = null;
+        let drawNeighborhoodName = '';
+        let activeNeighborhoodDrawer = null;
+        let drawControlVisible = false;
+        let lastRoadLookup = 0;
+
+        const neighborhoodDrawControl = new L.Control.Draw({
+            position: 'topleft',
+            draw: {
+                polygon: { allowIntersection: false, showArea: true, shapeOptions: { color: '#ffd166', fillColor: '#f4b942', fillOpacity: 0.25 } },
+                polyline: false,
+                rectangle: false,
+                circle: false,
+                marker: false,
+                circlemarker: false
+            },
+            edit: { featureGroup: neighborhoodsLayer, edit: true, remove: true }
+        });
+
+        maplibreGL({ style: 'https://tiles.openfreemap.org/styles/liberty' }).addTo(map);
+        function refreshMapAfterReturn() {
+            map.invalidateSize({ pan: false });
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) saveMapView();
+            else refreshMapAfterReturn();
+        });
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) refreshMapAfterReturn();
+        });
+
+        const roadGlow = L.geoJSON(null, {
+            style: { color: '#ff173a', weight: 18, opacity: 0.34, lineCap: 'round', lineJoin: 'round', interactive: false }
+        });
+
+        const highlightedRoad = L.geoJSON(null, {
+            style: { color: '#ff2438', weight: 7, opacity: 1, lineCap: 'round', lineJoin: 'round', className: 'road-red-glow' },
+            onEachFeature: (feature, layer) => {
+                layer.bindTooltip(feature.properties.label, { sticky: true });
+                layer.on('click', (event) => showRoadPopup(feature.properties, event.latlng));
+            }
+        });
+
+        const roadClassLabels = {
+            motorway: 'طريق سريع',
+            trunk: 'طريق شرياني',
+            primary: 'شارع رئيسي',
+            secondary: 'شارع ثانوي',
+            tertiary: 'شارع تجميعي',
+            residential: 'شارع محلي'
+        };
+
+        function calculateLengthMeters(coordinates) {
+            const earthRadius = 6371000;
+            let length = 0;
+
+            for (let index = 1; index < coordinates.length; index += 1) {
+                const [longitude1, latitude1] = coordinates[index - 1];
+                const [longitude2, latitude2] = coordinates[index];
+                const latitudeDelta = (latitude2 - latitude1) * Math.PI / 180;
+                const longitudeDelta = (longitude2 - longitude1) * Math.PI / 180;
+                const haversine = Math.sin(latitudeDelta / 2) ** 2
+                    + Math.cos(latitude1 * Math.PI / 180) * Math.cos(latitude2 * Math.PI / 180)
+                    * Math.sin(longitudeDelta / 2) ** 2;
+                length += 2 * earthRadius * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+            }
+
+            return length;
+        }
+
+        async function getRoadNetworkRoute(start, end) {
+            const routeUrl = `https://router.project-osrm.org/route/v1/driving/${start[0]},${start[1]};${end[0]},${end[1]}?overview=full&geometries=geojson&steps=false`;
+            const response = await fetch(routeUrl, { signal: AbortSignal.timeout(12000) });
+            if (!response.ok) throw new Error(`Road router returned ${response.status}`);
+            const routeData = await response.json();
+            const coordinates = routeData.routes?.[0]?.geometry?.coordinates;
+            if (routeData.code !== 'Ok' || !coordinates?.length) {
+                throw new Error('No road-network connection was found');
+            }
+            return coordinates;
+        }
+
+        async function extendRoadToTarget(features, target) {
+            const roadCoordinates = features.length > 1
+                ? (await connectRoadSegments(features)).coordinates
+                : features[0].geometry.coordinates;
+            const startDistance = calculateLengthMeters([roadCoordinates[0], target]);
+            const endDistance = calculateLengthMeters([roadCoordinates.at(-1), target]);
+            const orientedRoad = startDistance < endDistance ? roadCoordinates.slice().reverse() : roadCoordinates;
+            const roadEnd = orientedRoad.at(-1);
+            const extension = await getRoadNetworkRoute(roadEnd, target);
+
+            return [...orientedRoad, ...extension.slice(1), target];
+        }
+
+        async function connectRoadSegments(features) {
+            const segments = features.map((feature) => feature.geometry.coordinates.map((coordinate) => [...coordinate]));
+            let routedConnections = 0;
+
+            while (segments.length > 1) {
+                let nearest = { distance: Infinity };
+
+                for (let firstIndex = 0; firstIndex < segments.length; firstIndex += 1) {
+                    for (let secondIndex = firstIndex + 1; secondIndex < segments.length; secondIndex += 1) {
+                        const endpoints = [
+                            { first: 0, second: 0 },
+                            { first: 0, second: -1 },
+                            { first: -1, second: 0 },
+                            { first: -1, second: -1 }
+                        ];
+
+                        endpoints.forEach(({ first, second }) => {
+                            const firstPoint = segments[firstIndex].at(first);
+                            const secondPoint = segments[secondIndex].at(second);
+                            const distance = calculateLengthMeters([firstPoint, secondPoint]);
+                            if (distance < nearest.distance) {
+                                nearest = { firstIndex, secondIndex, first, second, firstPoint, secondPoint, distance };
+                            }
+                        });
+                    }
+                }
+
+                const firstSegment = nearest.first === 0
+                    ? segments[nearest.firstIndex].slice().reverse()
+                    : segments[nearest.firstIndex];
+                const secondSegment = nearest.second === 0
+                    ? segments[nearest.secondIndex]
+                    : segments[nearest.secondIndex].slice().reverse();
+                let connector;
+
+                if (nearest.distance <= 50) {
+                    connector = [nearest.firstPoint, nearest.secondPoint];
+                } else {
+                    const routeCoordinates = await getRoadNetworkRoute(nearest.firstPoint, nearest.secondPoint);
+                    connector = [nearest.firstPoint, ...routeCoordinates.slice(1, -1), nearest.secondPoint];
+                    routedConnections += 1;
+                }
+
+                const mergedSegment = [
+                    ...firstSegment,
+                    ...connector.slice(1),
+                    ...secondSegment.slice(1)
+                ];
+                segments.splice(nearest.secondIndex, 1);
+                segments.splice(nearest.firstIndex, 1, mergedSegment);
+            }
+
+            return { coordinates: segments[0], routedConnections };
+        }
+
+        function getRoadPropertyValues(features) {
+            const lengthMeters = features.reduce((total, feature) => total + calculateLengthMeters(feature.geometry.coordinates), 0);
+            const lengthValue = lengthMeters >= 1000
+                ? `${(lengthMeters / 1000).toLocaleString('ar', { maximumFractionDigits: 2 })} كم`
+                : `${Math.round(lengthMeters).toLocaleString('ar')} م`;
+            const widths = [...new Set(features.map((feature) => feature.properties.width).filter(Boolean))];
+            const classifications = [...new Set(features.map((feature) => feature.properties.roadClass).filter(Boolean))];
+
+            return {
+                length: lengthValue,
+                width: widths.length
+                ? widths.map((width) => `${width} م`).join('، ')
+                    : '40–50 م (تقديري)',
+                classification: classifications.length
+                ? classifications.map((type) => roadClassLabels[type] || type).join('، ')
+                    : 'غير محدد'
+            };
+        }
+
+        function displayRoadProperties(properties) {
+            document.getElementById('road-length').textContent = properties.length;
+            document.getElementById('road-width').textContent = properties.width;
+            document.getElementById('road-classification').textContent = properties.classification;
+            roadProperties.hidden = false;
+        }
+
+        function showRoadPopup(properties, latlng) {
+            document.getElementById('map-popup-title').textContent = properties.label;
+            mapPopupRows.replaceChildren();
+            const rows = [
+                ['الطول', properties.length],
+                ['العرض', properties.width],
+                ['التصنيف', properties.classification]
+            ];
+            if (properties.destination) rows.push(['يمتد إلى', properties.destination]);
+
+            rows.forEach(([label, value]) => {
+                const row = mapPopupRows.insertRow();
+                const heading = document.createElement('th');
+                heading.scope = 'row';
+                heading.textContent = label;
+                const cell = row.insertCell();
+                cell.textContent = value;
+                row.append(heading, cell);
+            });
+
+            mapRoadPopup.hidden = false;
+            const mapBounds = map.getContainer().getBoundingClientRect();
+            const clickPoint = map.latLngToContainerPoint(latlng);
+            const popupBounds = mapRoadPopup.getBoundingClientRect();
+            const left = Math.max(12, Math.min(
+                mapBounds.left + clickPoint.x + 16,
+                window.innerWidth - popupBounds.width - 12
+            ));
+            const top = Math.max(12, Math.min(
+                mapBounds.top + clickPoint.y - popupBounds.height / 2,
+                window.innerHeight - popupBounds.height - 12
+            ));
+
+            mapRoadPopup.style.left = `${left}px`;
+            mapRoadPopup.style.top = `${top}px`;
+        }
+
+        function hideRoadPopup() { mapRoadPopup.hidden = true; }
+
+        function cancelNeighborhoodDrawing(message) {
+            const drawer = activeNeighborhoodDrawer;
+            activeNeighborhoodDrawer = null;
+            drawNeighborhoodName = '';
+            cancelNeighborhoodDrawingButton.disabled = true;
+            if (drawer) drawer.disable();
+            if (message) neighborhoodStatus.textContent = message;
+        }
+
+        function activateService(service) {
+            const isRoads = service === 'roads';
+            const isHospitals = service === 'hospitals';
+            const isNeighborhoods = service === 'neighborhoods';
+            if (!isNeighborhoods && activeNeighborhoodDrawer) cancelNeighborhoodDrawing();
+            roadsTab.setAttribute('aria-selected', String(isRoads));
+            hospitalsTab.setAttribute('aria-selected', String(isHospitals));
+            neighborhoodsTab.setAttribute('aria-selected', String(isNeighborhoods));
+            roadsService.hidden = !isRoads;
+            hospitalsService.hidden = !isHospitals;
+            neighborhoodsService.hidden = !isNeighborhoods;
+            hideRoadPopup();
+
+            const activeLayers = isRoads
+                ? [roadGlow, highlightedRoad, roadDestination]
+                : isHospitals
+                    ? [hospitalLayer, selectedHospitalLayer]
+                    : [neighborhoodsLayer];
+            const allLayers = [roadGlow, highlightedRoad, roadDestination, hospitalLayer, selectedHospitalLayer, neighborhoodsLayer];
+            const inactiveLayers = allLayers.filter((layer) => !activeLayers.includes(layer));
+
+            inactiveLayers.forEach((layer) => {
+                if (map.hasLayer(layer)) map.removeLayer(layer);
+            });
+            activeLayers.forEach((layer) => {
+                if (!map.hasLayer(layer)) map.addLayer(layer);
+            });
+
+            if (service === 'neighborhoods' && !drawControlVisible) {
+                map.addControl(neighborhoodDrawControl);
+                drawControlVisible = true;
+            } else if (service !== 'neighborhoods' && drawControlVisible) {
+                map.removeControl(neighborhoodDrawControl);
+                drawControlVisible = false;
+            }
+        }
+
+        [roadsTab, hospitalsTab, neighborhoodsTab].forEach((tab) => {
+            const service = tab === roadsTab ? 'roads' : tab === hospitalsTab ? 'hospitals' : 'neighborhoods';
+            tab.addEventListener('click', () => activateService(service));
+            tab.addEventListener('keydown', (event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const tabs = [roadsTab, hospitalsTab, neighborhoodsTab];
+                const currentIndex = tabs.indexOf(tab);
+                const nextIndex = event.key === 'Home'
+                    ? 0
+                    : event.key === 'End'
+                        ? tabs.length - 1
+                        : (currentIndex + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+                const nextTab = tabs[nextIndex];
+                nextTab.focus();
+                activateService(nextTab === roadsTab ? 'roads' : nextTab === hospitalsTab ? 'hospitals' : 'neighborhoods');
+            });
+        });
+
+        document.getElementById('map-popup-close').addEventListener('click', hideRoadPopup);
+        window.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+            hideRoadPopup();
+            if (activeNeighborhoodDrawer) cancelNeighborhoodDrawing('تم إلغاء رسم حدود الحي.');
+        });
+        map.on('movestart', hideRoadPopup);
+
+        const governmentHospitalData = [
+            {
+                osmType: 'way',
+                osmId: 310491179,
+                name: 'مستشفى الخرطوم',
+                operator: 'وزارة الصحة',
+                address: { road: 'شارع الاسبتالية', city: 'الخرطوم' },
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [[[32.5293444, 15.5983662], [32.5295556, 15.5972428], [32.5296271, 15.5968715], [32.5298386, 15.596613], [32.5317293, 15.5969057], [32.5327456, 15.597063], [32.5355534, 15.5974688], [32.5352157, 15.5993273], [32.533396, 15.5989979], [32.5307666, 15.598568], [32.5293444, 15.5983662]]]
+                }
+            },
+            {
+                osmType: 'way',
+                osmId: 233756202,
+                name: 'مستشفى أم درمان التعليمي',
+                operator: 'وزارة الصحة',
+                address: { road: 'شارع بيت الخليفة', residential: 'ام درمان', suburb: 'الهاشماب', city: 'موقف مواصلات القرية' },
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [[[32.4865, 15.6410465], [32.487735, 15.6410642], [32.4879629, 15.6411332], [32.4881318, 15.6413504], [32.4881853, 15.6414999], [32.4882219, 15.6427171], [32.4867297, 15.6429465], [32.48659, 15.6420102], [32.4865, 15.6410465]]]
+                }
+            },
+            {
+                osmType: 'way',
+                osmId: 310497165,
+                name: 'مستشفى التجاني الماحي',
+                operator: 'وزارة الصحة',
+                address: { road: 'شارع العرضة', residential: 'ام درمان', suburb: 'البوسطة شمال', city: 'موقف مواصلات القرية' },
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [[[32.4817171, 15.640902], [32.4822439, 15.640771], [32.4830135, 15.6405768], [32.4832508, 15.6414958], [32.4818603, 15.6418561], [32.4817171, 15.640902]]]
+                }
+            }
+        ];
+
+        function hospitalLocation(address) {
+            const locality = address.city || address.town || address.residential || '';
+            return [address.road, address.suburb, locality]
+                .filter((value, index, values) => value && values.indexOf(value) === index)
+                .join('، ') || 'الخرطوم الكبرى';
+        }
+
+        function showHospitalProperties(properties) {
+            document.getElementById('hospital-operator').textContent = properties.operator || 'غير موثق في المصدر';
+            document.getElementById('hospital-location').textContent = properties.location;
+            document.getElementById('hospital-type').textContent = 'مستشفى حكومي';
+            document.getElementById('hospital-osm-id').textContent = `${properties.osmType}/${properties.osmId}`;
+            hospitalProperties.hidden = false;
+        }
+
+        function selectHospital(id) {
+            const feature = hospitalFeatures.get(id);
+            if (!feature) return;
+
+            selectedHospitalLayer.clearLayers();
+            selectedHospitalLayer.addData(feature);
+            showHospitalProperties(feature.properties);
+            const bounds = selectedHospitalLayer.getBounds();
+            if (bounds.isValid()) map.fitBounds(bounds.pad(0.8), { maxZoom: 17 });
+            hospitalStatus.textContent = `تم تحديد ${feature.properties.label} وتقريب الخريطة عليه.`;
+        }
+
+        function neighborhoodId() {
+            return globalThis.crypto?.randomUUID?.() || `neighborhood-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        }
+
+        function saveNeighborhoods() {
+            try {
+                const features = neighborhoodsLayer.getLayers().map((layer) => {
+                    const feature = layer.toGeoJSON();
+                    feature.properties = { ...(layer.feature?.properties || feature.properties || {}) };
+                    return feature;
+                });
+                localStorage.setItem(neighborhoodStorageKey, JSON.stringify({ type: 'FeatureCollection', features }));
+                return true;
+            } catch (error) {
+                neighborhoodStatus.textContent = 'تعذر الحفظ المحلي. قد تكون مساحة التخزين ممتلئة.';
+                console.error('Could not save neighborhoods:', error);
+                return false;
+            }
+        }
+
+        function neighborhoodStyle(feature) {
+            return {
+                color: feature.properties?.id === selectedNeighborhoodId ? '#fff5bf' : '#ffd166',
+                weight: feature.properties?.id === selectedNeighborhoodId ? 4 : 2,
+                fillColor: feature.properties?.id === selectedNeighborhoodId ? '#ffc83d' : '#f4b942',
+                fillOpacity: feature.properties?.id === selectedNeighborhoodId ? 0.5 : 0.24
+            };
+        }
+
+        function addNeighborhoodFeature(feature) {
+            const properties = { ...(feature.properties || {}) };
+            properties.id ||= neighborhoodId();
+            properties.name = String(properties.name || 'حي جديد').trim();
+            feature.properties = properties;
+
+            const rendered = L.geoJSON(feature, {
+                style: neighborhoodStyle,
+                onEachFeature: (part, layer) => {
+                    layer.feature = part;
+                    layer.bindTooltip(part.properties.name, { sticky: true });
+                    layer.on('click', () => selectNeighborhood(part.properties.id));
+                }
+            });
+            rendered.eachLayer((layer) => neighborhoodsLayer.addLayer(layer));
+            return properties.id;
+        }
+
+        function refreshNeighborhoodList() {
+            neighborhoodList.replaceChildren(new Option('اختر حيًا مضافًا', ''));
+            const neighborhoods = new Map();
+
+            neighborhoodsLayer.eachLayer((layer) => {
+                const properties = layer.feature?.properties;
+                if (properties?.id && !neighborhoods.has(properties.id)) {
+                    neighborhoods.set(properties.id, properties);
+                }
+            });
+
+            [...neighborhoods.values()]
+                .sort((first, second) => first.name.localeCompare(second.name, 'ar'))
+                .forEach((properties) => {
+                    neighborhoodList.add(new Option(properties.name, properties.id));
+                });
+
+            neighborhoodList.value = selectedNeighborhoodId || '';
+            const hasSelectedNeighborhood = neighborhoods.has(selectedNeighborhoodId);
+            updateNeighborhoodNameButton.disabled = !hasSelectedNeighborhood;
+            deleteSelectedNeighborhoodButton.disabled = !hasSelectedNeighborhood;
+        }
+
+        function selectNeighborhood(id) {
+            const selectedLayers = [];
+            neighborhoodsLayer.eachLayer((layer) => {
+                const active = layer.feature?.properties?.id === id;
+                layer.setStyle(neighborhoodStyle(layer.feature));
+                layer.closeTooltip();
+                if (active) selectedLayers.push(layer);
+            });
+
+            if (!selectedLayers.length) return;
+            selectedNeighborhoodId = id;
+            selectedLayers.forEach((layer) => layer.setStyle(neighborhoodStyle(layer.feature)));
+            const bounds = L.featureGroup(selectedLayers).getBounds();
+            if (bounds.isValid()) map.fitBounds(bounds.pad(0.15), { maxZoom: 16 });
+
+            const selectedFeature = selectedLayers[0].feature;
+            neighborhoodNameInput.value = selectedFeature.properties.name;
+            updateNeighborhoodNameButton.disabled = false;
+            neighborhoodStatus.textContent = `تم تحديد حي ${selectedFeature.properties.name} والتقريب عليه.`;
+            refreshNeighborhoodList();
+        }
+
+        neighborhoodList.addEventListener('change', () => {
+            if (neighborhoodList.value) {
+                selectNeighborhood(neighborhoodList.value);
+                return;
+            }
+
+            selectedNeighborhoodId = null;
+            neighborhoodNameInput.value = '';
+            updateNeighborhoodNameButton.disabled = true;
+            deleteSelectedNeighborhoodButton.disabled = true;
+            neighborhoodsLayer.eachLayer((layer) => layer.setStyle(neighborhoodStyle(layer.feature)));
+        });
+
+        deleteSelectedNeighborhoodButton.addEventListener('click', () => {
+            if (selectedNeighborhoodId) deleteNeighborhood(selectedNeighborhoodId);
+        });
+
+        function deleteNeighborhood(id) {
+            const layersToRemove = [];
+            neighborhoodsLayer.eachLayer((layer) => {
+                if (layer.feature?.properties?.id === id) layersToRemove.push(layer);
+            });
+            layersToRemove.forEach((layer) => neighborhoodsLayer.removeLayer(layer));
+            if (selectedNeighborhoodId === id) {
+                selectedNeighborhoodId = null;
+                updateNeighborhoodNameButton.disabled = true;
+                deleteSelectedNeighborhoodButton.disabled = true;
+                neighborhoodNameInput.value = '';
+            }
+            saveNeighborhoods();
+            refreshNeighborhoodList();
+            neighborhoodStatus.textContent = 'تم حذف الحي وحفظ التغيير.';
+        }
+
+        function updateSelectedNeighborhoodName() {
+            const name = neighborhoodNameInput.value.trim();
+            if (!selectedNeighborhoodId || !name) {
+                neighborhoodStatus.textContent = 'اختر حيًا واكتب الاسم الجديد أولًا.';
+                return;
+            }
+
+            neighborhoodsLayer.eachLayer((layer) => {
+                if (layer.feature?.properties?.id !== selectedNeighborhoodId) return;
+                layer.feature.properties.name = name;
+                layer.unbindTooltip();
+                layer.bindTooltip(name, { sticky: true });
+            });
+
+            saveNeighborhoods();
+            refreshNeighborhoodList();
+            neighborhoodStatus.textContent = `تم تحديث اسم الحي إلى ${name}.`;
+        }
+
+        function extractPolygonFeatures(payload) {
+            if (Array.isArray(payload)) return payload.flatMap(extractPolygonFeatures);
+            if (payload?.type === 'FeatureCollection') return payload.features.flatMap(extractPolygonFeatures);
+            if (payload?.type === 'Feature') {
+                return ['Polygon', 'MultiPolygon'].includes(payload.geometry?.type) ? [payload] : [];
+            }
+            if (payload && typeof payload === 'object') {
+                return Object.values(payload).flatMap(extractPolygonFeatures);
+            }
+            return [];
+        }
+
+        function importedFeatureName(properties) {
+            const nameKey = Object.keys(properties || {}).find((key) => {
+                const normalized = key.toLocaleLowerCase().replace(/[^a-z\u0600-\u06ff]/g, '');
+                return ['name', 'neighborhood', 'neighbourhood', 'district', 'حي'].some((part) => normalized.includes(part));
+            });
+            return nameKey ? String(properties[nameKey] || '').trim() : '';
+        }
+
+        function loadSavedNeighborhoods() {
+            try {
+                const saved = localStorage.getItem(neighborhoodStorageKey);
+                if (!saved) return;
+                extractPolygonFeatures(JSON.parse(saved)).forEach(addNeighborhoodFeature);
+                refreshNeighborhoodList();
+                neighborhoodStatus.textContent = 'تم استعادة الأحياء المحفوظة في هذا المتصفح.';
+            } catch (error) {
+                neighborhoodStatus.textContent = 'تعذر استعادة بعض الأحياء المحفوظة.';
+                console.error('Could not restore saved neighborhoods:', error);
+            }
+        }
+
+        async function importNeighborhoodShapefile(file) {
+            if (!file) return;
+            neighborhoodStatus.textContent = `جارٍ استيراد ${file.name}...`;
+
+            try {
+                if (typeof globalThis.shp !== 'function') throw new Error('Shapefile library did not load');
+                const imported = extractPolygonFeatures(await globalThis.shp(await file.arrayBuffer()));
+                if (!imported.length) throw new Error('The archive contains no polygon features');
+
+                const suppliedName = neighborhoodNameInput.value.trim();
+                const baseName = file.name.replace(/\.zip$/i, '');
+                const importedIds = imported.map((feature, index) => {
+                    const attributeName = importedFeatureName(feature.properties);
+                    feature.properties = {
+                        ...feature.properties,
+                        id: neighborhoodId(),
+                        name: attributeName || (imported.length === 1 && suppliedName ? suppliedName : `${suppliedName || baseName} ${index + 1}`),
+                        source: file.name
+                    };
+                    return addNeighborhoodFeature(feature);
+                });
+
+                saveNeighborhoods();
+                refreshNeighborhoodList();
+                selectNeighborhood(importedIds[0]);
+                neighborhoodStatus.textContent = `تم استيراد ${imported.length} مضلع حي من ${file.name}.`;
+                activateService('neighborhoods');
+            } catch (error) {
+                neighborhoodStatus.textContent = 'تعذر استيراد الملف. استخدم ZIP يحتوي ملفات Shapefile ‏(.shp و .shx و .dbf) بإحداثيات جغرافية صحيحة.';
+                console.error('Could not import neighborhood shapefile:', error);
+            } finally {
+                document.getElementById('neighborhood-file').value = '';
+            }
+        }
+
+        document.getElementById('draw-neighborhood').addEventListener('click', () => {
+            drawNeighborhoodName = neighborhoodNameInput.value.trim();
+            if (!drawNeighborhoodName) {
+                neighborhoodStatus.textContent = 'اكتب اسم الحي قبل بدء رسم حدوده.';
+                neighborhoodNameInput.focus();
+                return;
+            }
+
+            activateService('neighborhoods');
+            if (activeNeighborhoodDrawer) cancelNeighborhoodDrawing();
+            activeNeighborhoodDrawer = new L.Draw.Polygon(map, {
+                allowIntersection: false,
+                showArea: true,
+                shapeOptions: { color: '#ffd166', fillColor: '#f4b942', fillOpacity: 0.24 }
+            });
+            activeNeighborhoodDrawer.enable();
+            cancelNeighborhoodDrawingButton.disabled = false;
+            neighborhoodStatus.textContent = 'انقر على الخريطة لإضافة رؤوس الحدود، ثم انقر على نقطة البداية لإغلاق المضلع.';
+        });
+
+        cancelNeighborhoodDrawingButton.addEventListener('click', () => {
+            cancelNeighborhoodDrawing('تم إلغاء رسم حدود الحي.');
+        });
+
+        updateNeighborhoodNameButton.addEventListener('click', updateSelectedNeighborhoodName);
+        document.getElementById('neighborhood-file').addEventListener('change', (event) => {
+            importNeighborhoodShapefile(event.target.files[0]);
+        });
+
+        map.on(L.Draw.Event.CREATED, (event) => {
+            const feature = event.layer.toGeoJSON();
+            feature.properties = { id: neighborhoodId(), name: drawNeighborhoodName, source: 'manual' };
+            addNeighborhoodFeature(feature);
+            saveNeighborhoods();
+            refreshNeighborhoodList();
+            selectNeighborhood(feature.properties.id);
+            neighborhoodStatus.textContent = `تمت إضافة حي ${drawNeighborhoodName} إلى الخريطة.`;
+            drawNeighborhoodName = '';
+            activeNeighborhoodDrawer = null;
+            cancelNeighborhoodDrawingButton.disabled = true;
+        });
+
+        map.on(L.Draw.Event.DRAWSTOP, () => {
+            if (!activeNeighborhoodDrawer) return;
+            cancelNeighborhoodDrawing('تم إلغاء رسم حدود الحي.');
+        });
+
+        map.on(L.Draw.Event.EDITED, () => {
+            saveNeighborhoods();
+            refreshNeighborhoodList();
+            neighborhoodStatus.textContent = 'تم تحديث حدود الأحياء وحفظها.';
+        });
+
+        map.on(L.Draw.Event.DELETED, () => {
+            selectedNeighborhoodId = null;
+            neighborhoodNameInput.value = '';
+            updateNeighborhoodNameButton.disabled = true;
+            saveNeighborhoods();
+            refreshNeighborhoodList();
+            neighborhoodStatus.textContent = 'تم حذف الأحياء المحددة وحفظ التغيير.';
+        });
+
+        loadSavedNeighborhoods();
+
+        function loadGovernmentHospitals() {
+            const features = governmentHospitalData.map((hospital) => {
+                const id = `${hospital.osmType[0].toUpperCase()}${hospital.osmId}`;
+                const feature = {
+                    type: 'Feature',
+                    properties: {
+                        id,
+                        label: hospital.name,
+                        operator: hospital.operator,
+                        location: hospitalLocation(hospital.address),
+                        osmType: hospital.osmType,
+                        osmId: hospital.osmId
+                    },
+                    geometry: hospital.geometry
+                };
+                hospitalFeatures.set(id, feature);
+                return feature;
+            });
+
+            hospitalLayer.addData({ type: 'FeatureCollection', features });
+            hospitalSelect.replaceChildren(new Option('اختر مستشفى حكوميًا', ''));
+            features.forEach((feature) => hospitalSelect.add(new Option(feature.properties.label, feature.properties.id)));
+            hospitalSelect.disabled = false;
+            hospitalStatus.textContent = `تم تحميل ${features.length} مضلعًا لمستشفيات حكومية.`;
+        }
+
+        hospitalSelect.addEventListener('change', () => {
+            if (hospitalSelect.value) selectHospital(hospitalSelect.value);
+            else {
+                selectedHospitalLayer.clearLayers();
+                hospitalProperties.hidden = true;
+                hospitalStatus.textContent = 'اختر مستشفى لإظهار بياناته والتقريب عليه.';
+            }
+        });
+
+        activateService('roads');
+        loadGovernmentHospitals();
+
+        async function highlightSelectedRoad() {
+            const option = roadSelect.selectedOptions[0];
+            hideRoadPopup();
+            highlightedRoad.clearLayers();
+            roadGlow.clearLayers();
+            roadDestination.clearLayers();
+            roadProperties.hidden = true;
+            if (!option.value) {
+                roadStatus.textContent = 'اختر طريقًا رئيسيًا لإبرازه على الخريطة.';
+                return;
+            }
+
+            roadSelect.disabled = true;
+            roadStatus.textContent = `جارٍ تحديد ${option.dataset.label}...`;
+            try {
+                const wait = Math.max(0, 1100 - (Date.now() - lastRoadLookup));
+                if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
+                lastRoadLookup = Date.now();
+
+                const query = `${option.value}, Khartoum, Sudan`;
+                const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&extratags=1&limit=50&q=${encodeURIComponent(query)}`;
+                const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
+                if (!response.ok) throw new Error(`OpenStreetMap search returned ${response.status}`);
+
+                const results = await response.json();
+                const normalizedName = option.value.toLocaleLowerCase().replace(/\s+/g, ' ');
+                let features = results
+                    .filter((result) => {
+                        const displayName = result.display_name.toLocaleLowerCase().replace(/\s+/g, ' ');
+                        return result.geojson?.type === 'LineString' && displayName.includes(normalizedName) && displayName.includes('khartoum');
+                    })
+                    .map((result) => ({
+                        type: 'Feature',
+                        properties: {
+                            label: option.dataset.label,
+                            color: option.dataset.color,
+                            width: result.extratags?.width,
+                            roadClass: result.type
+                        },
+                        geometry: result.geojson
+                    }));
+
+                if (!features.length) {
+                    roadStatus.textContent = 'لم يُعثر على مسار لهذا الشارع في بيانات OpenStreetMap.';
+                    return;
+                }
+
+                let propertyValues;
+                let routedConnections = 0;
+                let destinationLabel;
+
+                if (option.value === 'Nile Street' && features.length > 1) {
+                    propertyValues = getRoadPropertyValues(features);
+                    roadStatus.textContent = 'جارٍ وصل مقاطع شارع النيل عبر شبكة الطرق...';
+                    const connectedRoad = await connectRoadSegments(features);
+                    routedConnections = connectedRoad.routedConnections;
+                    features = [{
+                        type: 'Feature',
+                        properties: { ...features[0].properties },
+                        geometry: { type: 'LineString', coordinates: connectedRoad.coordinates }
+                    }];
+                } else if (option.value === 'Al Qasr Street') {
+                    destinationLabel = option.dataset.destinationLabel;
+                    roadStatus.textContent = `جارٍ تمديد ${option.dataset.label} إلى ${destinationLabel}...`;
+                    const target = [Number(option.dataset.destinationLon), Number(option.dataset.destinationLat)];
+                    const extendedCoordinates = await extendRoadToTarget(features, target);
+                    features = [{
+                        type: 'Feature',
+                        properties: { ...features[0].properties, destination: destinationLabel },
+                        geometry: { type: 'LineString', coordinates: extendedCoordinates }
+                    }];
+                    propertyValues = getRoadPropertyValues(features);
+                    L.circleMarker([target[1], target[0]], {
+                        radius: 8,
+                        color: '#ffffff',
+                        weight: 3,
+                        fillColor: '#ff2438',
+                        fillOpacity: 1
+                    }).bindTooltip(destinationLabel).addTo(roadDestination);
+                } else {
+                    propertyValues = getRoadPropertyValues(features);
+                }
+
+                features.forEach((feature) => Object.assign(feature.properties, propertyValues));
+                roadGlow.addData({ type: 'FeatureCollection', features });
+                highlightedRoad.addData({ type: 'FeatureCollection', features });
+                displayRoadProperties(propertyValues);
+                const bounds = highlightedRoad.getBounds();
+                if (bounds.isValid()) map.fitBounds(bounds.pad(0.15), { maxZoom: 16 });
+                roadStatus.textContent = destinationLabel
+                    ? `تم تمديد ${option.dataset.label} إلى ${destinationLabel}.`
+                    : routedConnections
+                    ? `تم وصل مقاطع ${option.dataset.label} عبر شبكة الطرق وتظليلها.`
+                    : `تم تظليل ${option.dataset.label} على الخريطة.`;
+            } catch (error) {
+                roadStatus.textContent = 'تعذر جلب مسار الشارع الآن. تحقق من الاتصال وحاول مرة أخرى.';
+                console.error('Could not locate selected Khartoum road:', error);
+            } finally {
+                roadSelect.disabled = false;
+            }
+        }
+
+        roadSelect.addEventListener('change', highlightSelectedRoad);
+    </script>
+</body>
+</html>
